@@ -1,0 +1,114 @@
+{
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "users": [
+    {
+      "name": "notification_service",
+      "password_hash": "MEZK8vr/jYy456meUBbgtTL5NXVyjOMz8caqkqtWPwPOhUD4",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": "administrator"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "notification_service",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "notifications.dlx",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "notifications-critical",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "notifications.dlx",
+        "x-max-priority": 10
+      }
+    },
+    {
+      "name": "notifications-default",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "notifications.dlx",
+        "x-max-priority": 10
+      }
+    },
+    {
+      "name": "notifications-marketing",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "notifications.dlx",
+        "x-max-priority": 10
+      }
+    },
+    {
+      "name": "notifications-critical.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "notifications-default.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "notifications-marketing.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "notifications.dlx",
+      "vhost": "/",
+      "destination": "notifications-critical.dlq",
+      "destination_type": "queue",
+      "routing_key": "notifications-critical",
+      "arguments": {}
+    },
+    {
+      "source": "notifications.dlx",
+      "vhost": "/",
+      "destination": "notifications-default.dlq",
+      "destination_type": "queue",
+      "routing_key": "notifications-default",
+      "arguments": {}
+    },
+    {
+      "source": "notifications.dlx",
+      "vhost": "/",
+      "destination": "notifications-marketing.dlq",
+      "destination_type": "queue",
+      "routing_key": "notifications-marketing",
+      "arguments": {}
+    }
+  ]
+}

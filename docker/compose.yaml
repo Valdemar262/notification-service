@@ -1,0 +1,130 @@
+name: notification-service
+
+x-app: &app
+  build:
+    context: ..
+    dockerfile: docker/php/Dockerfile
+  image: notification-service-app:local
+  working_dir: /var/www/html
+  volumes:
+    - ..:/var/www/html
+    - app-vendor:/var/www/html/vendor
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
+  networks:
+    - notification-service
+
+services:
+  app:
+    <<: *app
+    command: ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(@file_get_contents(\"http://127.0.0.1:8000/up\") === false ? 1 : 0);'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  queue-critical:
+    <<: *app
+    command:
+      - php
+      - artisan
+      - queue:work
+      - rabbitmq
+      - --queue=notifications-critical
+      - --tries=5
+      - --sleep=1
+      - --timeout=60
+      - --no-interaction
+    restart: unless-stopped
+
+  queue-default:
+    <<: *app
+    command:
+      - php
+      - artisan
+      - queue:work
+      - rabbitmq
+      - --queue=notifications-default
+      - --tries=5
+      - --sleep=1
+      - --timeout=60
+      - --no-interaction
+    restart: unless-stopped
+
+  queue-marketing:
+    <<: *app
+    command:
+      - php
+      - artisan
+      - queue:work
+      - rabbitmq
+      - --queue=notifications-marketing
+      - --tries=5
+      - --sleep=3
+      - --timeout=60
+      - --no-interaction
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-notification_service}
+      POSTGRES_USER: ${DB_USERNAME:-notification_service}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+    ports:
+      - "${FORWARD_DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-notification_service} -d ${DB_DATABASE:-notification_service}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - notification-service
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${FORWARD_REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - notification-service
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    ports:
+      - "${FORWARD_RABBITMQ_PORT:-5672}:5672"
+      - "${FORWARD_RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      - notification-service
+
+networks:
+  notification-service:
+    driver: bridge
+
+volumes:
+  app-vendor:
+  postgres-data:
+  rabbitmq-data:
