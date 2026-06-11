@@ -92,6 +92,49 @@ Stop the stack:
 docker compose -f docker/compose.yaml down
 ```
 
+## API
+
+OpenAPI contract:
+
+```text
+openapi.yaml
+```
+
+Create a notification batch:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/notification-batches \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: example-batch-1' \
+  -d '{
+    "channel": "sms",
+    "priority": "transactional",
+    "message": "Your code is 1234",
+    "recipient_ids": ["subscriber-1", "subscriber-2"],
+    "initiator": "auth-service"
+  }'
+```
+
+Get subscriber notification history:
+
+```bash
+curl -H 'Accept: application/json' \
+  'http://localhost:8000/api/v1/subscribers/subscriber-1/notifications?status=sent'
+```
+
+Register a fake provider delivery event:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/provider-events/fake-sms \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "provider_message_id": "fake-sms-message-id",
+    "event_type": "delivered"
+  }'
+```
+
 ## Queues
 
 RabbitMQ queues are created from `docker/rabbitmq/definitions.json`:
