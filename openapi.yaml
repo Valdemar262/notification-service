@@ -1,0 +1,182 @@
+openapi: 3.1.0
+info:
+  title: Notification Service API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+paths:
+  /api/v1/notification-batches:
+    post:
+      summary: Create a notification batch
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNotificationBatchRequest'
+      responses:
+        '202':
+          description: Batch accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationBatchResponse'
+        '422':
+          description: Validation error
+  /api/v1/notification-batches/{batch}:
+    get:
+      summary: Get notification batch status
+      parameters:
+        - name: batch
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Batch status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationBatchResponse'
+        '404':
+          description: Batch not found
+  /api/v1/subscribers/{externalId}/notifications:
+    get:
+      summary: Get subscriber notification history
+      parameters:
+        - name: externalId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: channel
+          in: query
+          schema:
+            $ref: '#/components/schemas/NotificationChannel'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/NotificationStatus'
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Subscriber notifications
+        '404':
+          description: Subscriber not found
+  /api/v1/provider-events/{provider}:
+    post:
+      summary: Register provider delivery event
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderEventRequest'
+      responses:
+        '202':
+          description: Event accepted
+        '404':
+          description: Notification not found
+        '422':
+          description: Validation error
+components:
+  schemas:
+    NotificationChannel:
+      type: string
+      enum: [sms, email]
+    NotificationPriority:
+      type: string
+      enum: [transactional, marketing]
+    NotificationStatus:
+      type: string
+      enum: [queued, sent, delivered, dropped]
+    CreateNotificationBatchRequest:
+      type: object
+      required: [channel, priority, message, recipient_ids]
+      properties:
+        channel:
+          $ref: '#/components/schemas/NotificationChannel'
+        priority:
+          $ref: '#/components/schemas/NotificationPriority'
+        message:
+          type: string
+        recipient_ids:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items:
+            type: string
+          uniqueItems: true
+        initiator:
+          type: string
+          nullable: true
+    ProviderEventRequest:
+      type: object
+      required: [provider_message_id, event_type]
+      properties:
+        provider_message_id:
+          type: string
+        event_type:
+          type: string
+          enum: [delivered, dropped]
+        reason:
+          type: string
+          nullable: true
+        payload:
+          type: object
+          nullable: true
+    NotificationBatch:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        idempotency_key:
+          type: string
+        channel:
+          $ref: '#/components/schemas/NotificationChannel'
+        priority:
+          $ref: '#/components/schemas/NotificationPriority'
+        counters:
+          type: object
+          properties:
+            requested_recipients:
+              type: integer
+            accepted_notifications:
+              type: integer
+            queued:
+              type: integer
+            sent:
+              type: integer
+            delivered:
+              type: integer
+            dropped:
+              type: integer
+    NotificationBatchResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/NotificationBatch'
